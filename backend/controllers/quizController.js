@@ -1,7 +1,6 @@
 const Quiz = require("../models/Quiz");
 const generateQuizCode = require("../utils/generateQuizCode");
 const geminiService = require("../services/geminiService");
-const fs = require("fs");
 const pdfParse = require("pdf-parse");
 const Attempt = require("../models/Attempt");
 
@@ -44,12 +43,10 @@ exports.createQuiz = async (req, res) => {
       const data = await pdfParse(file.buffer);
       extractedText = data.text;
       console.log("PDF parsed, text length:", extractedText.length);
-    }
-    else if (file.mimetype === "text/plain") {
+    } else if (file.mimetype === "text/plain") {
       extractedText = file.buffer.toString("utf8");
       console.log("TXT parsed, text length:", extractedText.length);
-    }
-    else {
+    } else {
       return res.status(400).json({ message: "Unsupported file type. Please upload PDF or TXT files." });
     }
 
@@ -150,7 +147,7 @@ exports.getQuizByCode = async (req, res) => {
   }
 };
 
-// SUBMIT ATTEMPT (Single version - keep this one)
+// SUBMIT ATTEMPT
 exports.submitAttempt = async (req, res) => {
   try {
     const { quizCode } = req.params;
