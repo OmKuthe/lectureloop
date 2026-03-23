@@ -5,7 +5,6 @@ const fs = require("fs");
 const pdfParse = require("pdf-parse");
 const Attempt = require("../models/Attempt");
 
-
 function generateFeedback(percentage) {
   if (percentage >= 90) {
     return "Excellent! You have mastered this topic!";
@@ -24,7 +23,134 @@ function generateFeedback(percentage) {
   }
 }
 
-// Update the submitAttempt function
+// CREATE QUIZ
+exports.createQuiz = async (req, res) => {
+  try {
+    const file = req.file;
+
+    if (!file) {
+      return res.status(400).json({ message: "No file uploaded" });
+    }
+
+    console.log("Processing file:", {
+      name: file.originalname,
+      type: file.mimetype,
+      size: file.size
+    });
+
+    let extractedText = "";
+
+    if (file.mimetype === "application/pdf") {
+      const data = await pdfParse(file.buffer);
+      extractedText = data.text;
+      console.log("PDF parsed, text length:", extractedText.length);
+    }
+    else if (file.mimetype === "text/plain") {
+      extractedText = file.buffer.toString("utf8");
+      console.log("TXT parsed, text length:", extractedText.length);
+    }
+    else {
+      return res.status(400).json({ message: "Unsupported file type. Please upload PDF or TXT files." });
+    }
+
+    if (!extractedText || extractedText.trim().length === 0) {
+      return res.status(400).json({ message: "No text could be extracted from the file" });
+    }
+
+    console.log("Generating questions from lecture content...");
+    
+    const generatedQuestions = await geminiService.generateQuizQuestions(extractedText, 10);
+    
+    console.log(`Successfully generated ${generatedQuestions.length} questions`);
+
+    const quizCode = generateQuizCode();
+
+    const newQuiz = new Quiz({
+      quizCode,
+      questions: generatedQuestions,
+      metadata: {
+        generatedAt: new Date(),
+        generatedBy: "Gemini AI",
+        questionCount: generatedQuestions.length,
+        types: {
+          mcq: generatedQuestions.length,
+        },
+        difficulties: {
+          easy: generatedQuestions.filter(q => q.difficulty === 'easy').length,
+          medium: generatedQuestions.filter(q => q.difficulty === 'medium').length,
+          hard: generatedQuestions.filter(q => q.difficulty === 'hard').length
+        }
+      }
+    });
+
+    await newQuiz.save();
+
+    res.status(201).json({
+      message: "Quiz created successfully",
+      quizCode,
+      metadata: newQuiz.metadata,
+      questionCount: generatedQuestions.length
+    });
+
+  } catch (error) {
+    console.error("Error creating quiz:", error);
+    
+    let errorMessage = "Error creating quiz";
+    if (error.message.includes("API key")) {
+      errorMessage = "Invalid Gemini API key. Please check your configuration.";
+    } else if (error.message.includes("quota")) {
+      errorMessage = "API quota exceeded. Please try again later.";
+    } else if (error.message.includes("file")) {
+      errorMessage = "Error processing file: " + error.message;
+    }
+    
+    res.status(500).json({ 
+      message: errorMessage,
+      error: error.message 
+    });
+  }
+};
+
+// GET QUIZ BY CODE
+exports.getQuizByCode = async (req, res) => {
+  try {
+    const { quizCode } = req.params;
+
+    const quiz = await Quiz.findOne({ quizCode });
+
+    if (!quiz) {
+      return res.status(404).json({ message: "Quiz not found" });
+    }
+
+    const questionsWithoutAnswers = quiz.questions.map((q, idx) => {
+      const baseQuestion = {
+        id: idx,
+        question: q.question,
+        type: q.type,
+        difficulty: q.difficulty
+      };
+      
+      if (q.type === 'mcq' || q.type === 'truefalse') {
+        baseQuestion.options = q.options;
+      }
+      
+      return baseQuestion;
+    });
+
+    res.status(200).json({
+      quizCode: quiz.quizCode,
+      questions: questionsWithoutAnswers,
+      metadata: quiz.metadata,
+      totalQuestions: quiz.questions.length
+    });
+
+  } catch (error) {
+    console.error("Error fetching quiz:", error);
+    res.status(500).json({ message: "Error fetching quiz" });
+  }
+};
+
+// SUBMIT ATTEMPT (Single version - keep this one)
 exports.submitAttempt = async (req, res) => {
   try {
     const { quizCode } = req.params;
@@ -43,7 +169,6 @@ exports.submitAttempt = async (req, res) => {
     let score = 0;
     const detailedResults = [];
 
-    // Grade each question
     quiz.questions.forEach((q, index) => {
       const studentAnswer = answers[index];
       let isCorrect = false;
@@ -51,7 +176,6 @@ exports.submitAttempt = async (req, res) => {
       let userAnswerDisplay = studentAnswer;
       
       if (q.type === 'mcq') {
-        // Handle different answer formats
         if (typeof studentAnswer === 'number') {
           isCorrect = studentAnswer === q.correctAnswer;
         } else if (typeof studentAnswer === 'string') {
@@ -103,11 +227,9 @@ exports.submitAttempt = async (req, res) => {
 
     await attempt.save();
 
-    // Calculate additional stats for feedback
     const correctAnswers = detailedResults.filter(r => r.isCorrect).length;
     const wrongAnswers = detailedResults.filter(r => !r.isCorrect).length;
     
-    // Find weak areas (questions that were answered incorrectly)
     const weakAreas = detailedResults
       .filter(r => !r.isCorrect)
       .map(r => ({
@@ -124,7 +246,7 @@ exports.submitAttempt = async (req, res) => {
       passed,
       correctAnswers,
       wrongAnswers,
-      weakAreas: weakAreas.slice(0, 3), // Send top 3 weak areas
+      weakAreas: weakAreas.slice(0, 3),
       detailedResults,
       feedback: generateFeedback(percentage),
       performance: {
@@ -143,242 +265,8 @@ exports.submitAttempt = async (req, res) => {
     });
   }
 };
-exports.createQuiz = async (req, res) => {
-  try {
-    const file = req.file;
 
-    if (!file) {
-      return res.status(400).json({ message: "No file uploaded" });
-    }
-
-    console.log("Processing file:", {
-      name: file.originalname,
-      type: file.mimetype,
-      size: file.size
-    });
-
-    let extractedText = "";
-
-    // Extract text from file buffer (memory) instead of disk
-    if (file.mimetype === "application/pdf") {
-      const data = await pdfParse(file.buffer);
-      extractedText = data.text;
-      console.log("PDF parsed, text length:", extractedText.length);
-    }
-    else if (file.mimetype === "text/plain") {
-      extractedText = file.buffer.toString("utf8");
-      console.log("TXT parsed, text length:", extractedText.length);
-    }
-    else {
-      return res.status(400).json({ message: "Unsupported file type. Please upload PDF or TXT files." });
-    }
-
-    // Validate extracted text
-    if (!extractedText || extractedText.trim().length === 0) {
-      return res.status(400).json({ message: "No text could be extracted from the file" });
-    }
-
-    // Show generation status
-    console.log("Generating questions from lecture content...");
-    
-    // Generate questions using Gemini AI
-    const generatedQuestions = await geminiService.generateQuizQuestions(extractedText, 10);
-    
-    console.log(`Successfully generated ${generatedQuestions.length} questions`);
-
-    // Generate unique quiz code
-    const quizCode = generateQuizCode();
-
-    // Create quiz with AI-generated questions
-    const newQuiz = new Quiz({
-      quizCode,
-      questions: generatedQuestions,
-      metadata: {
-        generatedAt: new Date(),
-        generatedBy: "Gemini AI",
-        questionCount: generatedQuestions.length,
-        types: {
-          mcq: generatedQuestions.length,
-        },
-        difficulties: {
-          easy: generatedQuestions.filter(q => q.difficulty === 'easy').length,
-          medium: generatedQuestions.filter(q => q.difficulty === 'medium').length,
-          hard: generatedQuestions.filter(q => q.difficulty === 'hard').length
-        }
-      }
-    });
-
-    await newQuiz.save();
-
-    res.status(201).json({
-      message: "Quiz created successfully",
-      quizCode,
-      metadata: newQuiz.metadata,
-      questionCount: generatedQuestions.length
-    });
-
-  } catch (error) {
-    console.error("Error creating quiz:", error);
-    
-    // Provide helpful error message
-    let errorMessage = "Error creating quiz";
-    if (error.message.includes("API key")) {
-      errorMessage = "Invalid Gemini API key. Please check your configuration.";
-    } else if (error.message.includes("quota")) {
-      errorMessage = "API quota exceeded. Please try again later.";
-    } else if (error.message.includes("file")) {
-      errorMessage = "Error processing file: " + error.message;
-    }
-    
-    res.status(500).json({ 
-      message: errorMessage,
-      error: error.message 
-    });
-  }
-};
-
-    // Generate unique quiz code
-    const quizCode = generateQuizCode();
-
-    exports.getQuizByCode = async (req, res) => {
-      try {
-        const { quizCode } = req.params;
-    
-        const quiz = await Quiz.findOne({ quizCode });
-    
-        if (!quiz) {
-          return res.status(404).json({ message: "Quiz not found" });
-        }
-    
-        // Format questions for student view (without correct answers)
-        const questionsWithoutAnswers = quiz.questions.map((q, idx) => {
-          const baseQuestion = {
-            id: idx,
-            question: q.question,
-            type: q.type,
-            difficulty: q.difficulty
-          };
-          
-          // Add options for MCQ and True/False
-          if (q.type === 'mcq' || q.type === 'truefalse') {
-            baseQuestion.options = q.options;
-          }
-          
-          return baseQuestion;
-        });
-    
-        res.status(200).json({
-          quizCode: quiz.quizCode,
-          questions: questionsWithoutAnswers,
-          metadata: quiz.metadata,
-          totalQuestions: quiz.questions.length
-        });
-    
-      } catch (error) {
-        console.error("Error fetching quiz:", error);
-        res.status(500).json({ message: "Error fetching quiz" });
-      }
-    };
-
-exports.submitAttempt = async (req, res) => {
-  try {
-    const { quizCode } = req.params;
-    const { studentName, answers } = req.body;
-
-    if (!studentName || !answers) {
-      return res.status(400).json({ message: "Student name and answers are required" });
-    }
-
-    const quiz = await Quiz.findOne({ quizCode });
-
-    if (!quiz) {
-      return res.status(404).json({ message: "Quiz not found" });
-    }
-
-    let score = 0;
-    const detailedResults = [];
-
-    // Grade each question based on type
-    quiz.questions.forEach((q, index) => {
-      const studentAnswer = answers[index];
-      let isCorrect = false;
-      let correctAnswer = null;
-      let userAnswerDisplay = studentAnswer;
-      
-      if (q.type === 'mcq') {
-        // For MCQ, compare indices
-        if (typeof studentAnswer === 'number' && studentAnswer === q.correctAnswer) {
-          isCorrect = true;
-        } else if (typeof studentAnswer === 'string' && q.options) {
-          // Handle case where answer is sent as string instead of index
-          const answerIndex = q.options.findIndex(opt => opt.toLowerCase() === studentAnswer.toLowerCase());
-          isCorrect = answerIndex === q.correctAnswer;
-        }
-        correctAnswer = q.options[q.correctAnswer];
-        userAnswerDisplay = q.options[studentAnswer] || studentAnswer;
-      } 
-      else if (q.type === 'truefalse') {
-        // For True/False, compare indices
-        isCorrect = studentAnswer === q.correctAnswer;
-        correctAnswer = q.options[q.correctAnswer];
-        userAnswerDisplay = q.options[studentAnswer] || studentAnswer;
-      }
-      else if (q.type === 'matching') {
-        // For matching, compare arrays
-        if (Array.isArray(studentAnswer) && Array.isArray(q.correctMatches)) {
-          isCorrect = JSON.stringify(studentAnswer) === JSON.stringify(q.correctMatches);
-          correctAnswer = q.correctMatches;
-          userAnswerDisplay = studentAnswer;
-        }
-      }
-      
-      if (isCorrect) {
-        score++;
-      }
-      
-      detailedResults.push({
-        questionIndex: index,
-        isCorrect,
-        correctAnswer,
-        userAnswer: userAnswerDisplay,
-        explanation: q.explanation,
-        questionType: q.type
-      });
-    });
-
-    const percentage = ((score / quiz.questions.length) * 100).toFixed(2);
-    const passed = percentage >= 60;
-
-    const attempt = new Attempt({
-      quizCode,
-      studentName,
-      answers,
-      score,
-      totalQuestions: quiz.questions.length,
-      percentage,
-      passed,
-      completedAt: new Date(),
-      detailedResults
-    });
-
-    await attempt.save();
-
-    res.status(200).json({
-      message: "Quiz submitted successfully",
-      score,
-      total: quiz.questions.length,
-      percentage,
-      passed,
-      detailedResults,
-      feedback: generateFeedback(percentage)
-    });
-
-  } catch (error) {
-    console.error("Error submitting quiz:", error);
-    res.status(500).json({ message: "Error submitting quiz" });
-  }
-};
-
+// GET QUIZ ANALYTICS
 exports.getQuizAnalytics = async (req, res) => {
   try {
     const { quizCode } = req.params;
@@ -401,7 +289,6 @@ exports.getQuizAnalytics = async (req, res) => {
     const passRate = ((attempts.filter(a => a.passed).length / totalStudents) * 100).toFixed(2);
     const topScore = Math.max(...attempts.map(a => a.score));
     
-    // Get recent 5 attempts
     const recentAttempts = attempts.slice(0, 5).map(a => ({
       studentName: a.studentName,
       score: a.score,
@@ -410,7 +297,6 @@ exports.getQuizAnalytics = async (req, res) => {
       completedAt: a.completedAt
     }));
 
-    // Calculate question difficulty analysis
     const quiz = await Quiz.findOne({ quizCode });
     let questionAnalysis = [];
     
@@ -421,8 +307,6 @@ exports.getQuizAnalytics = async (req, res) => {
             return a.answers[idx] === q.correctAnswer;
           } else if (q.type === 'truefalse') {
             return a.answers[idx] === q.correctAnswer;
-          } else if (q.type === 'matching') {
-            return JSON.stringify(a.answers[idx]) === JSON.stringify(q.correctMatches);
           }
           return false;
         }).length;
@@ -461,7 +345,7 @@ exports.getQuizAnalytics = async (req, res) => {
   }
 };
 
-// Additional endpoint to get quiz statistics
+// GET QUIZ STATS
 exports.getQuizStats = async (req, res) => {
   try {
     const { quizCode } = req.params;

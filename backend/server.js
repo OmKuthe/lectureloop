@@ -1,6 +1,5 @@
 require('dotenv').config();
 
-
 console.log("=== Environment Check ===");
 console.log("GEMINI_API_KEY exists:", !!process.env.GEMINI_API_KEY);
 console.log("GEMINI_API_KEY first 10 chars:", process.env.GEMINI_API_KEY?.substring(0, 10));
@@ -24,9 +23,9 @@ app.use(cors({
 
 app.use(express.json());
 
-app.use("/quiz", quizRoutes);
+app.use("/api/quiz", quizRoutes);
 
-app.get("/", (req, res) => {
+app.get("/api", (req, res) => {
   res.send("LectureLoop API Running");
 });
 
