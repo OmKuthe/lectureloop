@@ -29,7 +29,7 @@ function StudentJoin() {
     }
 
     // Navigate to quiz page with data
-    navigate(`/api/quiz/${quizCode}`, {
+    navigate(`/quiz/${quizCode}`, {
       state: { studentName: name }
     });
   };
