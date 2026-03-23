@@ -38,7 +38,7 @@ function QuizPage() {
   useEffect(() => {
     const fetchQuiz = async () => {
       try {
-        const res = await API.get(`/quiz/${quizCode}`);
+        const res = await API.get(`/api/quiz/${quizCode}`);
         setQuestions(res.data.questions || []);
         setAnswers(new Array(res.data.questions?.length || 0).fill(null));
       } catch (error) {
@@ -103,7 +103,7 @@ function QuizPage() {
 
   const submitQuiz = async (finalAnswers) => {
     try {
-      const res = await API.post(`/quiz/${quizCode}/submit`, {
+      const res = await API.post(`/api/quiz/${quizCode}/submit`, {
         studentName,
         answers: finalAnswers
       });
