@@ -23,7 +23,7 @@ app.use(cors({
 }));
 app.use(express.json());
 
-app.use("/api/quiz", quizRoutes);
+app.use("/quiz", quizRoutes);
 
 app.get("/", (req, res) => {
   res.send("LectureLoop API Running");
