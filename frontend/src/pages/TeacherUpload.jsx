@@ -32,7 +32,7 @@ function TeacherUpload() {
     formData.append("file", file);
 
     try {
-      const res = await API.post("/quiz/create", formData);
+      const res = await API.post("/api/quiz/create", formData);
       setQuizCode(res.data.quizCode);
     } catch (err) {
       console.error(err);
