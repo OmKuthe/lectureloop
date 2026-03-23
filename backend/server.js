@@ -11,8 +11,6 @@ const cors = require("cors");
 const dotenv = require("dotenv");
 const connectDB = require("./config/db");
 const quizRoutes = require("./routes/quizRoutes");
-// server.js - At the VERY TOP (before any other imports)
-
 
 dotenv.config();
 connectDB();
