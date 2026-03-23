@@ -143,7 +143,6 @@ exports.submitAttempt = async (req, res) => {
     });
   }
 };
-
 exports.createQuiz = async (req, res) => {
   try {
     const file = req.file;
@@ -152,20 +151,26 @@ exports.createQuiz = async (req, res) => {
       return res.status(400).json({ message: "No file uploaded" });
     }
 
+    console.log("Processing file:", {
+      name: file.originalname,
+      type: file.mimetype,
+      size: file.size
+    });
+
     let extractedText = "";
 
-    // Extract text from PDF
+    // Extract text from file buffer (memory) instead of disk
     if (file.mimetype === "application/pdf") {
-      const dataBuffer = fs.readFileSync(file.path);
-      const data = await pdfParse(dataBuffer);
+      const data = await pdfParse(file.buffer);
       extractedText = data.text;
+      console.log("PDF parsed, text length:", extractedText.length);
     }
-    // Extract text from TXT
     else if (file.mimetype === "text/plain") {
-      extractedText = fs.readFileSync(file.path, "utf8");
+      extractedText = file.buffer.toString("utf8");
+      console.log("TXT parsed, text length:", extractedText.length);
     }
     else {
-      return res.status(400).json({ message: "Unsupported file type" });
+      return res.status(400).json({ message: "Unsupported file type. Please upload PDF or TXT files." });
     }
 
     // Validate extracted text
@@ -205,13 +210,6 @@ exports.createQuiz = async (req, res) => {
 
     await newQuiz.save();
 
-    // Clean up uploaded file
-    try {
-      fs.unlinkSync(file.path);
-    } catch (err) {
-      console.error("Error deleting file:", err);
-    }
-
     res.status(201).json({
       message: "Quiz created successfully",
       quizCode,
@@ -222,21 +220,14 @@ exports.createQuiz = async (req, res) => {
   } catch (error) {
     console.error("Error creating quiz:", error);
     
-    // Clean up file if it exists
-    if (req.file && req.file.path) {
-      try {
-        fs.unlinkSync(req.file.path);
-      } catch (err) {
-        console.error("Error deleting file:", err);
-      }
-    }
-    
     // Provide helpful error message
     let errorMessage = "Error creating quiz";
     if (error.message.includes("API key")) {
       errorMessage = "Invalid Gemini API key. Please check your configuration.";
     } else if (error.message.includes("quota")) {
       errorMessage = "API quota exceeded. Please try again later.";
+    } else if (error.message.includes("file")) {
+      errorMessage = "Error processing file: " + error.message;
     }
     
     res.status(500).json({ 
