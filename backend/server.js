@@ -1,6 +1,6 @@
 require('dotenv').config();
 
-// Debug: Check if API key is loaded
+
 console.log("=== Environment Check ===");
 console.log("GEMINI_API_KEY exists:", !!process.env.GEMINI_API_KEY);
 console.log("GEMINI_API_KEY first 10 chars:", process.env.GEMINI_API_KEY?.substring(0, 10));
@@ -21,6 +21,7 @@ app.use(cors({
   origin: "*",
   methods: ["GET", "POST"]
 }));
+
 app.use(express.json());
 
 app.use("/quiz", quizRoutes);

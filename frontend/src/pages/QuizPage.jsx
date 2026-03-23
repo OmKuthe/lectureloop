@@ -21,7 +21,6 @@ function QuizPage() {
   const [loading, setLoading] = useState(true);
   const [timeUp, setTimeUp] = useState(false);
 
-  // Generate random positions and animations for bubbles
   const generateBubbles = () => {
     return Array.from({ length: 12 }, (_, i) => ({
       id: i,
