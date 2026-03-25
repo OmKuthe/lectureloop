@@ -49,7 +49,7 @@ function Dashboard() {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const res = await API.get(`/quiz/${quizCode}/analytics`);
+        const res = await API.get(`/api/quiz/${quizCode}/analytics`);
         
         const processedData = {
           ...res.data,
