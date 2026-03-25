@@ -39,7 +39,6 @@ function Dashboard() {
 
   const [bubbles] = useState(generateBubbles);
 
-  // Calculate percentage for a student
   const calculatePercentage = (score, totalQuestions) => {
     if (!totalQuestions || totalQuestions === 0) return 0;
     return Math.round((score / totalQuestions) * 100);
