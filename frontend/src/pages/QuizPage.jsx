@@ -1,4 +1,4 @@
-// pages/QuizPage.jsx - Enhanced with animations
+// pages/QuizPage.jsx
 import { useEffect, useState } from "react";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from 'framer-motion';

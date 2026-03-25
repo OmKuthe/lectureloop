@@ -26,7 +26,6 @@ function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Generate random positions and animations for bubbles
   const generateBubbles = () => {
     return Array.from({ length: 12 }, (_, i) => ({
       id: i,
@@ -52,7 +51,6 @@ function Dashboard() {
         setLoading(true);
         const res = await API.get(`/quiz/${quizCode}/analytics`);
         
-        // Process attempts to add percentage if not already present
         const processedData = {
           ...res.data,
           attempts: (res.data.attempts || res.data.recentAttempts || []).map(attempt => ({

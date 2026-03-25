@@ -26,7 +26,7 @@ function StudentJoin() {
       alert("Please enter both quiz code and your name");
       return;
     }
-    navigate(`/api/quiz/${quizCode}`, {
+    navigate(`/quiz/${quizCode}`, {
       state: { studentName: name }
     });
   };
