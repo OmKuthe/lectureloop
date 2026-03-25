@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import API from "../services/api";
+import { fileUploadAPI } from "../services/api";
 import { FaUpload, FaFileAlt, FaArrowLeft, FaChartLine, FaMagic, FaRocket } from "react-icons/fa";
 
 function TeacherUpload() {
@@ -31,7 +32,7 @@ function TeacherUpload() {
     formData.append("file", file);
 
     try {
-      const res = await API.post("/api/quiz/create", formData);
+      const res = await fileUploadAPI.post("/api/quiz/create", formData);
       setQuizCode(res.data.quizCode);
     } catch (err) {
       console.error(err);

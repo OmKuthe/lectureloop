@@ -20,7 +20,7 @@ console.log('API Base URL:', BASE_URL);
 const API = axios.create({
   baseURL: BASE_URL,
   headers: {
-    'Content-Type': 'application/json',
+    'Content-Type': 'multipart/form-data ',
   },
   timeout: 30000, // 30 seconds timeout for file uploads
 });
