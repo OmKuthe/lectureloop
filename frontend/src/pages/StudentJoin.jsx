@@ -8,7 +8,6 @@ function StudentJoin() {
   const [name, setName] = useState("");
   const navigate = useNavigate();
 
-  // Generate random positions and animations for bubbles
   const generateBubbles = () => {
     return Array.from({ length: 12 }, (_, i) => ({
       id: i,
@@ -27,9 +26,7 @@ function StudentJoin() {
       alert("Please enter both quiz code and your name");
       return;
     }
-
-    // Navigate to quiz page with data
-    navigate(`/quiz/${quizCode}`, {
+    navigate(`/api/quiz/${quizCode}`, {
       state: { studentName: name }
     });
   };
